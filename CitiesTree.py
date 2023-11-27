@@ -76,4 +76,3 @@ nearest_cities = find_nearest_cities(kdb_tree, user_target_coordinates)
 print("\nLas 5 ciudades más cercanas son:")
 for city_info in nearest_cities[:5]:
     print(f"Nombre: {city_info['city']}, Coordenadas: {city_info['coordinates']}, Distancia: {city_info['distance']}")
-
