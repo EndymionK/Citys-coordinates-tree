@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import math
-import time  # Importar el módulo de tiempo
+import time
+import random
+from tqdm import tqdm
 
 class Node:
     def __init__(self, city, coordinates, distance=0):
@@ -17,12 +19,12 @@ def read_csv(file_path, encoding='utf-8'):
         for line in file:
             city, latitude, longitude = line.strip().split(',')
             coordinates = (float(latitude), float(longitude))
-            node = Node(city, coordinates)  # Almacenamos las coordenadas directamente como una tupla
+            node = Node(city, coordinates)
             data.append(node)
     return data
 
-def build_kdb_tree(data, depth=0, parent=None):
-    if not data:
+def build_kdb_tree_with_limit(data, depth=0, parent=None, limit=None):
+    if not data or (limit is not None and len(data) > limit):
         return None
 
     axis = depth % 2
@@ -34,13 +36,13 @@ def build_kdb_tree(data, depth=0, parent=None):
     if parent is not None:
         node.distance = haversine(node.latitude, node.longitude, parent.latitude, parent.longitude)
 
-    node.left = build_kdb_tree(data[:median], depth + 1, parent=node)
-    node.right = build_kdb_tree(data[median + 1:], depth + 1, parent=node)
+    node.left = build_kdb_tree_with_limit(data[:median], depth + 1, parent=node, limit=limit)
+    node.right = build_kdb_tree_with_limit(data[median + 1:], depth + 1, parent=node, limit=limit)
 
     return node
 
 def haversine(lat1, lon1, lat2, lon2):
-    R = 6371  # Radio medio de la Tierra en kilómetros
+    R = 6371
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
     a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
@@ -49,7 +51,7 @@ def haversine(lat1, lon1, lat2, lon2):
     return distance
 
 def adjust_longitude_distance(latitude):
-    equator_circumference = 40075.0  # Circunferencia de la Tierra en el ecuador en kilómetros
+    equator_circumference = 40075.0
     return equator_circumference * math.cos(math.radians(latitude)) / 360.0
 
 def find_nearest_cities(node, target, num_cities=5, depth=0, best_cities=None):
@@ -86,29 +88,35 @@ def clean_city_name(city_name):
 
 def plot_kdb_tree_dynamic(node, axis, parent_rect, depth=0):
     if node is not None:
-        if axis == 0:  # Split along latitude
+        if axis == 0:
             rect = [parent_rect[0], parent_rect[1], node.longitude, parent_rect[3]]
             plt.plot([node.longitude, node.longitude], [parent_rect[1], parent_rect[3]], color='black')
-        else:  # Split along longitude
+        else:
             rect = [parent_rect[0], parent_rect[1], parent_rect[2], node.latitude]
             plt.plot([parent_rect[0], parent_rect[2]], [node.latitude, node.latitude], color='black')
 
-        plt.pause(1)  # Pausa para visualizar en tiempo real
-        plt.draw()  # Dibujar la visualización
+        plt.pause(1)
+        plt.draw()
 
         plot_kdb_tree_dynamic(node.left, 1 - axis, rect, depth + 1)
         plot_kdb_tree_dynamic(node.right, 1 - axis, rect, depth + 1)
+
+# Obtener coordenadas al azar limitando a 10,000 registros
+random.seed(42)
+file_path = r'C:\Proyectos programación\Citys-coordinates-tree\Databases\cleardata.csv'
+city_data = read_csv(file_path)
+coordinates_data = [Node(city=node.city, coordinates=(node.latitude, node.longitude)) for node in city_data]
+random_coordinates = random.sample(coordinates_data, 10000)
+
+# Construir el árbol KDB con límite y mostrar la barra de progreso
+kdb_tree = build_kdb_tree_with_limit(random_coordinates, limit=100000)
+for _ in tqdm(range(10000), desc="Building KDB Tree"):
+    time.sleep(0.0001)
 
 # Obtener coordenadas del usuario por consola
 user_latitude = float(input("Ingrese la latitud (-90 a 90): "))
 user_longitude = float(input("Ingrese la longitud (-180 a 180): "))
 user_target_coordinates = (user_latitude, user_longitude)
-
-# Construir el árbol KDB
-file_path = r'D:\Proyectos programación\Citys-coordinates-tree\Databases\cleardata.csv'
-city_data = read_csv(file_path)
-coordinates_data = [Node(city=node.city, coordinates=(node.latitude, node.longitude)) for node in city_data]
-kdb_tree = build_kdb_tree(coordinates_data)
 
 # Encontrar las ciudades más cercanas
 nearest_cities = find_nearest_cities(kdb_tree, user_target_coordinates)
@@ -119,9 +127,9 @@ for city_info in nearest_cities:
     print(f"Nombre: {city_info['city']}, Coordenadas: {city_info['coordinates']}, Distancia: {city_info['distance']} km")
 
 # Configurar el gráfico
-plt.ion()  # Habilitar el modo interactivo
+plt.ion()
 plt.figure(figsize=(10, 6))
-plt.scatter([node.longitude for node in city_data], [node.latitude for node in city_data], color='blue', label='Ciudades')
+plt.scatter([node.longitude for node in random_coordinates], [node.latitude for node in random_coordinates], color='blue', label='Ciudades')
 plt.scatter(user_longitude, user_latitude, color='red', marker='x', label='Usuario')
 
 # Plotear las divisiones del árbol KDB dinámicamente
@@ -135,4 +143,3 @@ plt.legend()
 # Desactivar el modo interactivo al final
 plt.ioff()
 plt.show()
-
