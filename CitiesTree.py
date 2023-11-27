@@ -1,3 +1,5 @@
+import math
+
 class Node:
     def __init__(self, city, latitude, longitude, distance=0):
         self.city = city
@@ -30,8 +32,23 @@ def build_kdb_tree(data, depth=0):
 
     return node
 
-def find_nearest_cities(node, target, num_cities=5, depth=0):
-    cities = []
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371  # Radio medio de la Tierra en kilómetros
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    distance = R * c
+    return distance
+
+def adjust_longitude_distance(latitude):
+    # Ajustar la distancia entre líneas de longitud en función de la latitud
+    equator_circumference = 40075.0  # Circunferencia de la Tierra en el ecuador en kilómetros
+    return equator_circumference * math.cos(math.radians(latitude)) / 360.0
+
+def find_nearest_cities(node, target, num_cities=5, depth=0, best_cities=None):
+    if best_cities is None:
+        best_cities = [{'city': None, 'coordinates': None, 'distance': float('inf')} for _ in range(num_cities)]
 
     if node is not None:
         axis = depth % 2
@@ -45,34 +62,36 @@ def find_nearest_cities(node, target, num_cities=5, depth=0):
             next_branch = node.right
             opposite_branch = node.left
 
-        next_best = find_nearest_cities(next_branch, target, num_cities, depth + 1)
-        cities.extend(next_best)
+        find_nearest_cities(next_branch, target, num_cities, depth + 1, best_cities)
 
-        if len(cities) < num_cities or opposite_branch is not None:
-            distance_to_target = distance(node.latitude, node.longitude, target[0], target[1])
-            cities.append({'city': node.city, 'coordinates': (node.latitude, node.longitude), 'distance': distance_to_target})
+        distance_to_target = haversine(node.latitude, node.longitude, target[0], target[1])
+        adjusted_longitude_distance = adjust_longitude_distance(node.latitude)
 
-            opposite_best = find_nearest_cities(opposite_branch, target, num_cities - len(cities), depth + 1)
-            cities.extend(opposite_best)
+        for i, city_info in enumerate(best_cities):
+            if distance_to_target < city_info['distance']:
+                best_cities.insert(i, {'city': node.city, 'coordinates': (node.latitude, node.longitude), 'distance': distance_to_target})
+                best_cities.pop()
+                break
 
-    return cities
+        if len(best_cities) < num_cities or opposite_branch is not None:
+            find_nearest_cities(opposite_branch, target, num_cities, depth + 1, best_cities)
 
-def distance(lat1, lon1, lat2, lon2):
-    return ((lat1 - lat2) ** 2 + (lon1 - lon2) ** 2) ** 0.5
+    return best_cities  # Devolver la lista de las ciudades más cercanas
 
 # Obtener coordenadas del usuario por consola
-user_latitude = float(input("Ingrese la latitud: "))
-user_longitude = float(input("Ingrese la longitud: "))
+user_latitude = float(input("Ingrese la latitud (-90 a 90): "))
+user_longitude = float(input("Ingrese la longitud (-180 a 180): "))
 user_target_coordinates = (user_latitude, user_longitude)
 
 # Construir el árbol KDB y encontrar las ciudades más cercanas
-file_path = r'C:\Proyectos programación\Citys-coordinates-tree\Databases\cleardata.csv'
+file_path = r'D:\Proyectos programación\Citys-coordinates-tree\Databases\cleardata.csv'
 city_data = read_csv(file_path)
 kdb_tree = build_kdb_tree(city_data)
 
+# Encontrar las ciudades más cercanas
 nearest_cities = find_nearest_cities(kdb_tree, user_target_coordinates)
 
 # Mostrar las 5 ciudades más cercanas
 print("\nLas 5 ciudades más cercanas son:")
-for city_info in nearest_cities[:5]:
-    print(f"Nombre: {city_info['city']}, Coordenadas: {city_info['coordinates']}, Distancia: {city_info['distance']}")
+for city_info in nearest_cities:
+    print(f"Nombre: {city_info['city']}, Coordenadas: {city_info['coordinates']}, Distancia: {city_info['distance']} km")
