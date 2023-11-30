@@ -101,17 +101,21 @@ def plot_kdb_tree_dynamic(node, axis, parent_rect, depth=0):
         plot_kdb_tree_dynamic(node.left, 1 - axis, rect, depth + 1)
         plot_kdb_tree_dynamic(node.right, 1 - axis, rect, depth + 1)
 
-# Obtener coordenadas al azar limitando a 10,000 registros
+# Obtener coordenadas al azar limitando a 1,000 registros
 random.seed(42)
-file_path = r'C:\Proyectos programación\Citys-coordinates-tree\Databases\cleardata.csv'
+file_path = r'D:\Proyectos programación\Citys-coordinates-tree\Databases\cleardata.csv'
 city_data = read_csv(file_path)
 coordinates_data = [Node(city=node.city, coordinates=(node.latitude, node.longitude)) for node in city_data]
-random_coordinates = random.sample(coordinates_data, 10000)
+
+user_cantidad = int(input("Ingrese la cantidad de ciudades para construir el arbol (No debe ser superior a 2.2M): "))
+random_coordinates = random.sample(coordinates_data, user_cantidad)
 
 # Construir el árbol KDB con límite y mostrar la barra de progreso
-kdb_tree = build_kdb_tree_with_limit(random_coordinates, limit=100000)
+
 for _ in tqdm(range(10000), desc="Building KDB Tree"):
     time.sleep(0.0001)
+kdb_tree = build_kdb_tree_with_limit(random_coordinates)
+print("Árbol KDB construido con éxito")
 
 # Obtener coordenadas del usuario por consola
 user_latitude = float(input("Ingrese la latitud (-90 a 90): "))
@@ -126,10 +130,24 @@ print("\nLas 5 ciudades más cercanas son:")
 for city_info in nearest_cities:
     print(f"Nombre: {city_info['city']}, Coordenadas: {city_info['coordinates']}, Distancia: {city_info['distance']} km")
 
+def count_levels(node, depth=0):
+    if node is None:
+        return depth
+    left_levels = count_levels(node.left, depth + 1)
+    right_levels = count_levels(node.right, depth + 1)
+    return max(left_levels, right_levels)
+
+
+kdb_tree = build_kdb_tree_with_limit(random_coordinates)
+
+# Imprime la cantidad de niveles
+num_levels = count_levels(kdb_tree)
+print(f"La cantidad de niveles del árbol KDB es: {num_levels}")
+
 # Configurar el gráfico
 plt.ion()
 plt.figure(figsize=(10, 6))
-plt.scatter([node.longitude for node in random_coordinates], [node.latitude for node in random_coordinates], color='blue', label='Ciudades')
+plt.scatter([node.longitude for node in random_coordinates], [node.latitude for node in random_coordinates], color='blue', label='Ciudades', s=10)
 plt.scatter(user_longitude, user_latitude, color='red', marker='x', label='Usuario')
 
 # Plotear las divisiones del árbol KDB dinámicamente
